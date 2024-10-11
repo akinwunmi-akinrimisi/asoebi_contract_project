@@ -8,12 +8,24 @@
     "hardhat": "^2.22.13",
     "husky": "^9.1.6",
     "lint-staged": "^15.2.10",
+    "prettier-plugin-solidity": "^1.4.1",
+    "solhint": "^5.0.3",
     "typescript-eslint": "^8.8.1"
   },
   "lint-staged": {
     "*.ts": [
       "eslint --fix",
       "prettier --write"
+    ],
+    "*.sol": [
+      "solhint --fix",
+      "prettier --write"
     ]
+  },
+  "scripts": {
+    "lint:ts": "eslint '**/*.ts' --fix",
+    "lint:sol": "solhint '**/*.sol' --fix",
+    "lint": "npm run lint:ts && npm run lint:sol",
+    "test": "npx hardhat test"
   }
 }
