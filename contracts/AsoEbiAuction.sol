@@ -225,7 +225,7 @@ escrowAddress= _escrowAddress;
         require(_getTime() <= auction.endTime && _getTime() >= auction.startTime, PlaceBid_InvaildAuction());
         // for the first bidder
         if (auction.minimumbidIsMinSellingPrice) {
-            require(msg.value >= auction.minimumBid);
+            require(msg.value >= auction.minimumBid,InvalidBid());
         }
 
         require(msg.value > highestBid.bid, PlaceBid_DidNotOutBid());
