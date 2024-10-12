@@ -4,12 +4,13 @@ pragma solidity 0.8.27;
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 interface IEscrow {
      function depositForAuction(address _nftAddress,uint _tokenId ,address payable _seller, address _winner , uint _winningbid) external payable;
 }
 
-contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard {
+contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard ,IERC721Receiver{
     // ===== ERROR ====
     error CreateAuction_InvalidOwner(address sender);
     error CreateAuction_InvalidSellingPrice();
@@ -66,6 +67,7 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard {
     );
 
     event AuctionCancelled(address indexed nftAddress, uint256 indexed tokenId);
+ event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
 
     // ======  USER DEFINED VALUES =====
 
@@ -366,5 +368,18 @@ function updateEscrowAddress(address _escrowAddress) external onlyOwner{
         require(!auction.finalized, CheckAuction_AuctionAlreadyFinalized());
 
         require(auction.endTime > 0, CheckAuction_AuctionDoesNotExist());
+    }
+
+
+
+    // Function to handle receiving an ERC-721 token
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external override returns (bytes4) {
+        emit NFTReceived(operator, from, tokenId, data);
+        return this.onERC721Received.selector;
     }
 }
