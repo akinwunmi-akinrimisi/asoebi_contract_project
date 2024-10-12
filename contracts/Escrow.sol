@@ -2,16 +2,19 @@
 pragma solidity 0.8.27;
 
 import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title Escrow
  * @author Damboy0
  * @dev Handles escrow for orders and auctions.
  */
-contract Escrow is ReentrancyGuard {
+contract Escrow is ReentrancyGuard,IERC721Receiver {
     address public owner;
     uint256 public feePercentage;
+    address public auctionContract;
 
     struct FinalizedAuction {
         address payable seller; // can be fabric seller or designer
@@ -42,6 +45,13 @@ contract Escrow is ReentrancyGuard {
     );
     event ReleaseForOrder(address indexed buyer, address indexed seller, uint256 amount);
     event ReleaseForAuction(address indexed nftAddress, uint256 indexed tokenId, address seller);
+    event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
+
+
+    modifier onlyOwner {
+        require(msg.sender == owner, "Escrow: not owner");
+        _;
+    }
 
     /**
      * @dev Constructor.
@@ -75,7 +85,7 @@ contract Escrow is ReentrancyGuard {
     ) external payable {
         require(IERC721(_nftAddress).ownerOf(_tokenId) == address(this), "Escrow: did not send nft");
         require(msg.value == _winningbid, "Escrow: value mismatch");
-        require(msg.sender == _seller, "Escrow: did not use auction contract");
+        require(msg.sender == auctionContract, "Escrow: did not use auction contract");
 
         auctionEscrow[_nftAddress][_tokenId] =
             FinalizedAuction({seller: _seller, winner: _winner, winningbid: _winningbid, isReceived: false});
@@ -129,5 +139,22 @@ contract Escrow is ReentrancyGuard {
         require(success2, "Escrow: failed to release fee");
 
         emit ReleaseForAuction(_nftAddress, _tokenId, finalizedAuction.seller);
+    }
+
+
+
+    function updateAuctionContract(address _auctionContract) onlyOwner external{
+            auctionContract = _auctionContract;
+    }
+
+    // Function to handle receiving an ERC-721 token
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external override returns (bytes4) {
+        emit NFTReceived(operator, from, tokenId, data);
+        return this.onERC721Received.selector;
     }
 }
