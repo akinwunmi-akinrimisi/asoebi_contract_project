@@ -5,7 +5,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-interface IESCROW {}
+interface IEscrow {
+     function depositForAuction(address _nftAddress,uint _tokenId ,address payable _seller, address _winner , uint _winningbid) external payable;
+}
 
 contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard {
     // ===== ERROR ====
@@ -99,7 +101,13 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard {
 
     // Nft Address -> Token ID -> HighestBId Struct
     mapping(address => mapping(uint256 => HighestBid)) public highestBids;
+address public escrowAddress ;
 
+
+ constructor (address _escrowAddress) {
+
+escrowAddress= _escrowAddress;
+}
     function createAuction(
         address _nftAddress,
         uint256 _tokenId,
@@ -181,14 +189,27 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard {
         require(auction.endTime < _getTime(), AuctionIsActive());
         require(winner != address(0), NoBid());
 
-        // if revert occurs here owner call do one of two thing (cancel auction or reduce the minimum selling price)
+        // if revert occurs here owner can do one of two thing (cancel auction or reduce the minimum selling price)
         require(winningBid >= auction.minimumSellingPrice, InvalidWinningBid());
 
         auction.finalized = true;
 
         delete highestBids[_nftAddress][_tokenId];
 
-        // Todo call the escrow contract by sending the nft and the winning bid to  it 
+       
+
+        // transfer the NFT to the escrow contract
+    IERC721(_nftAddress).safeTransferFrom(address(this), escrowAddress, _tokenId);
+
+    // call depositForAuction from the escrow contract, sending the winning bid 
+    IEscrow escrowContract = IEscrow(escrowAddress);
+    escrowContract.depositForAuction{value: winningBid}(
+        _nftAddress,
+        _tokenId,
+        payable(auction.owner),  //seller address
+        winner,                  // winner address
+        winningBid               // Winning bid amount
+    ); 
         emit AuctionFinalized(auction.owner, _nftAddress, _tokenId, winner, winningBid);
     }
 
@@ -277,6 +298,11 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard {
         emit UpdatedAuctionEndTime(_nftAddress, _tokenId, _endTimestamp);
     }
 
+    // ======  Owner's Function =====
+function updateEscrowAddress(address _escrowAddress) external onlyOwner{
+    escrowAddress =_escrowAddress;
+    
+}
     // ======  View Function =====
 
     function getAuction(address _nftAddress, uint256 _tokenId)
