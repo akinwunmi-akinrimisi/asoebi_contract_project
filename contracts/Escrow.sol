@@ -1,42 +1,53 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity 0.8.27;
 
+import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title Escrow
  * @author Damboy0
  * @dev Handles escrow for orders and auctions.
  */
-contract Escrow {
+contract Escrow is ReentrancyGuard {
     address public owner;
-    uint public feePercentage;
+    uint256 public feePercentage;
+
+    struct FinalizedAuction {
+        address payable seller; // can be fabric seller or designer
+        address winner;
+        uint256 winningbid;
+        bool isReceived;
+    }
 
     // Mapping of escrowed funds for orders
-    mapping (address => mapping (address => uint)) public orderEscrow;
+    mapping(address => mapping(address => uint256)) public orderEscrow;
 
-    // Mapping of escrowed funds for auctions
-    mapping (address => mapping (address => uint)) public auctionEscrow;
+    // // Mapping of escrowed funds for auctions
+    // mapping (address => mapping (address => uint)) public auctionEscrow;
 
     // Mapping of escrowed NFTs for auctions
-    mapping (address => mapping (address => address[])) public nftEscrow;
+    mapping(address => mapping(address => address[])) public nftEscrow;
 
     // Mapping of escrowed amounts for auctions
-    mapping (address => mapping (address => uint[])) public amountEscrow;
+    mapping(address => mapping(uint256 => FinalizedAuction)) public auctionEscrow;
 
     // Mapping of escrowed token addresses for auctions
-    mapping (address => mapping (address => address[])) public tokenEscrow;
+    mapping(address => mapping(address => address[])) public tokenEscrow;
 
     // ===== EVENTS =====
-    event DepositForOrder(address indexed buyer, address indexed seller, uint amount);
-    event DepositForAuction(address indexed buyer, address indexed seller, address nft, address token, uint amount);
-    event ReleaseForOrder(address indexed buyer, address indexed seller, uint amount);
-    event ReleaseForAuction(address indexed buyer, address indexed seller, address nft, address token, uint amount);
+    event DepositForOrder(address indexed buyer, address indexed seller, uint256 amount);
+    event DepositForAuction(
+        address indexed nftAddress, uint256 indexed tokenId, address seller, address indexed winner, uint256 winningBid
+    );
+    event ReleaseForOrder(address indexed buyer, address indexed seller, uint256 amount);
+    event ReleaseForAuction(address indexed nftAddress, uint256 indexed tokenId, address seller);
 
     /**
      * @dev Constructor.
      * @param _feePercentage The fee percentage.
      */
-    constructor (uint _feePercentage) {
+    constructor(uint256 _feePercentage) {
         owner = msg.sender;
         feePercentage = _feePercentage;
     }
@@ -44,7 +55,7 @@ contract Escrow {
     /**
      * @dev Deposit funds for an order.
      */
-    function depositForOrder(address seller, uint amount) external payable {
+    function depositForOrder(address seller, uint256 amount) external payable {
         require(msg.value == amount, "Escrow: value mismatch");
 
         orderEscrow[msg.sender][seller] += amount;
@@ -55,34 +66,40 @@ contract Escrow {
     /**
      * @dev Deposit funds and NFT for an auction.
      */
-    function depositForAuction(address seller, address nft, address token, uint amount) external payable {
-        require(msg.value == amount, "Escrow: value mismatch");
+    function depositForAuction(
+        address _nftAddress,
+        uint256 _tokenId,
+        address payable _seller,
+        address _winner,
+        uint256 _winningbid
+    ) external payable {
+        require(IERC721(_nftAddress).ownerOf(_tokenId) == address(this), "Escrow: did not send nft");
+        require(msg.value == _winningbid, "Escrow: value mismatch");
+        require(msg.sender == _seller, "Escrow: did not use auction contract");
 
-        auctionEscrow[msg.sender][seller] += amount;
-        nftEscrow[msg.sender][seller].push(nft);
-        amountEscrow[msg.sender][seller].push(amount);
-        tokenEscrow[msg.sender][seller].push(token);
+        auctionEscrow[_nftAddress][_tokenId] =
+            FinalizedAuction({seller: _seller, winner: _winner, winningbid: _winningbid, isReceived: false});
 
-        emit DepositForAuction(msg.sender, seller, nft, token, amount);
+        emit DepositForAuction(_nftAddress, _tokenId, _seller, _winner, _winningbid);
     }
 
     /**
      * @dev Release funds for an order.
      */
     function releaseForOrder(address buyer, address seller) external {
-        uint amount = orderEscrow[buyer][seller];
+        uint256 amount = orderEscrow[buyer][seller];
 
         require(amount > 0, "Escrow: no funds to release");
 
         orderEscrow[buyer][seller] = 0;
 
-        uint fee = (amount * feePercentage) / 100;
-        uint amountToRelease = amount - fee;
+        uint256 fee = (amount * feePercentage) / 100;
+        uint256 amountToRelease = amount - fee;
 
-        (bool success, ) = payable(seller).call{value: amountToRelease}("");
+        (bool success,) = payable(seller).call{value: amountToRelease}("");
         require(success, "Escrow: failed to release funds");
 
-        (bool success2, ) = payable(owner).call{value: fee}("");
+        (bool success2,) = payable(owner).call{value: fee}("");
         require(success2, "Escrow: failed to release fee");
 
         emit ReleaseForOrder(buyer, seller, amount);
@@ -91,28 +108,26 @@ contract Escrow {
     /**
      * @dev Release funds and NFT for an auction.
      */
-    function releaseForAuction(address buyer, address seller) external {
-        uint amount = auctionEscrow[buyer][seller];
+    function releaseForAuction(address _nftAddress, uint256 _tokenId) external nonReentrant {
+        FinalizedAuction storage finalizedAuction = auctionEscrow[_nftAddress][_tokenId];
 
-        require(amount > 0, "Escrow: no funds to release");
+        require(msg.sender == finalizedAuction.winner, "Escrow: not winner");
 
-        auctionEscrow[buyer][seller] = 0;
+        require(finalizedAuction.isReceived == false, "Escrow: auction Received");
 
-        uint fee = (amount * feePercentage) / 100;
-        uint amountToRelease = amount - fee;
+        finalizedAuction.isReceived = true;
 
-        (bool success, ) = payable(seller).call{value: amountToRelease}("");
-        require(success, "Escrow: failed to release funds");
+        IERC721(_nftAddress).safeTransferFrom(address(this), finalizedAuction.winner, _tokenId);
 
-        (bool success2, ) = payable(owner).call{value: fee}("");
+        uint256 fee = (finalizedAuction.winningbid * feePercentage) / 100;
+        uint256 amountToRelease = finalizedAuction.winningbid - fee;
+        (bool success,) = finalizedAuction.seller.call{value: amountToRelease}("");
+
+        require(success, "Escrow: failed to release fund");
+
+        (bool success2,) = payable(owner).call{value: fee}("");
         require(success2, "Escrow: failed to release fee");
 
-        address[] memory nfts = nftEscrow[buyer][seller];
-        for (uint i = 0; i < nfts.length; i++) {
-            // Transfer the NFT to the seller
-            // Implement the logic to transfer the NFT
-        }
-
-        emit ReleaseForAuction(buyer, seller, nfts[0], tokenEscrow[buyer][seller][0], amount);
+        emit ReleaseForAuction(_nftAddress, _tokenId, finalizedAuction.seller);
     }
 }
