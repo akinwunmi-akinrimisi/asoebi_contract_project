@@ -16,6 +16,13 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
     error OrderDoesExist();
     error  Alreadylisted( );
     error NotItemOwner();
+    error InvalidValue();
+    error InvalidQuantity();
+    error InvalidPrice();
+    error InsufficientFunds();
+    error NotListingOwner();
+    error NotVaildBuyer();
+    
 
     event ItemListed(
         address indexed seller,
@@ -72,7 +79,8 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
     }
 
     struct Listing {
-        uint256 quantity; // the amount of readytowears or farbic yards  avaliable for sale
+       // uint256 quantity; // the amount of readytowears or farbic yards  avaliable for sale
+       address owner; // seller/designer
         uint256 pricePerItem; // price per yard of fabric or price per ready to wear
         uint256 listingTime; 
         bool isListed;
@@ -86,12 +94,13 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
         uint256 timeofOrder;
         OrderStatus orderStatus;
         OrderType orderType;
+        uint256 totalPrice;
     }
 
 IERC721 public nftAddress = IERC721(address(this));
     mapping(address => User) public users;
-    // tokenid -> seller/designer -> Listing
-    mapping(uint256 => mapping(address => Listing)) public listings;
+    // tokenid  -> Listing
+    mapping(uint256 => Listing) public listings;
     // tokenid -> buyer -> Order
     mapping(uint256 => mapping(address => Order)) public orders;
 
@@ -100,23 +109,23 @@ IERC721 public nftAddress = IERC721(address(this));
         
         _;
     }
+     modifier validBuyer {
+        require(users[msg.sender].roleType == RoleType.Buyer , NotVaildBuyer()  );
+        
+        _;
+    }
 
 
 
     modifier isListed( uint256 _tokenId, address _owner) {
-        Listing memory listing = listings[_tokenId][_owner];
+        Listing memory listing = listings[_tokenId];
         require(listing.listingTime > 0, NotListed());
+        require(listing.owner == _owner, NotListingOwner());
         _;
     }
 
-    modifier notListed( uint256 _tokenId, address _owner) {     
-        Listing memory listing = listings[_tokenId][_owner];
-        require(listing.isListed == false, Alreadylisted());
-        _;
-    }                           
-
     modifier validListing( uint256 _tokenId, address _owner) {
-      Listing memory listing = listings[_tokenId][_owner];
+      Listing memory listing = listings[_tokenId];
         require(listing.isListed == false, Alreadylisted());
         _isOwner( _tokenId, _owner);
 
@@ -146,34 +155,91 @@ IERC721 public nftAddress = IERC721(address(this));
         });
     }
     function listItem(uint256 _tokenId, uint256 _quantity, uint256 _pricePerItem) external validLister validListing(_tokenId, msg.sender) {
+           require(_pricePerItem > 0, InvalidPrice());
+        require(_quantity > 0, InvalidQuantity());
+
         nftAddress.safeTransferFrom(msg.sender, address(this), _tokenId);
         ListingType listingType ;
         if (users[msg.sender].roleType == RoleType.FabricSeller ) {
             listingType = ListingType.Fabric;
-            listings[_tokenId][msg.sender] = Listing(_quantity, _pricePerItem, _getTime(), true, listingType, _quantity);
+            listings[_tokenId] = Listing(msg.sender, _pricePerItem, _getTime(), true, listingType, _quantity);
         } else {
             listingType = ListingType.ReadyToWear;
-                 listings[_tokenId][msg.sender] = Listing(_quantity, _pricePerItem, _getTime(), true, listingType, _quantity);
+                 listings[_tokenId] = Listing( msg.sender,_pricePerItem, _getTime(), true, listingType, _quantity);
         }
         
         emit ItemListed(msg.sender, _tokenId, _quantity, listingType, _pricePerItem);
     }
-    function updateListing() external {}
-    function CancelListing() external {}
-    function makeOrder() external {}
+
+
     
-    function acceptOrder(uint256 _tokenId, address _buyer) external isListed(_tokenId, msg.sender) orderExist(_tokenId, _buyer) {
+     function updateListing(uint256 _tokenId, uint256 _pricePerItem, uint256 _quantity) external validLister isListed(_tokenId,msg.sender) {
+        require(_quantity > 0 || _pricePerItem > 0, InvalidValue());
+
+        Listing storage listing = listings[_tokenId];
+        listing.pricePerItem = _pricePerItem;
+        listing.quantityLeft += _quantity;
+        emit ItemUpdated(msg.sender, _tokenId, _pricePerItem, _quantity);
+    }
+
+
+
+    function cancelListing(uint256 _tokenId) external validLister isListed(_tokenId, msg.sender) {  
+        delete ( listings[_tokenId]);
+        nftAddress.safeTransferFrom(address(this), msg.sender, _tokenId);
+        emit ItemCanceled(msg.sender, _tokenId);
+    }
+
+
+    function makeOrder(uint256 _tokenId, uint256 _quantity, string memory _shippingInfo) external payable validBuyer orderNotExists(_tokenId, msg.sender) {
+        require(_quantity > 0, InvalidQuantity());
+
+        _checkListing(_tokenId,_quantity);
+
+        Listing storage listing = listings[_tokenId];
+
+        require(listing.quantityLeft >= _quantity, InvalidQuantity());
+
+        uint256 totalPrice = listing.pricePerItem * _quantity;
+
+        require(msg.value >= totalPrice, InsufficientFunds());
+
+        listing.quantityLeft -= _quantity;
+        
+        OrderType orderType ;
+        if (listing.listingType == ListingType.Fabric){
+            orderType = OrderType.Fabric;
+        } else {
+              orderType = OrderType.ReadyToWear;
+        }
+
+        orders[_tokenId][msg.sender] = Order({
+            quantity: _quantity,
+            shippingInfo: _shippingInfo,
+            timeofOrder: block.timestamp,
+            orderStatus: OrderStatus.Pending,
+            orderType: orderType ,
+            totalPrice : msg.value 
+        });
+
+        
+
+        emit OrderCreated(msg.sender, _tokenId, _quantity, OrderType.Fabric);
+    }
+    //TODO 
+    function acceptOrder(uint256 _tokenId, address _buyer) external nonReentrant isListed(_tokenId, msg.sender) orderExist(_tokenId, _buyer) {
         Order storage order = orders[_tokenId][_buyer];
         order.orderStatus = OrderStatus.Accepted;
-        Listing storage listing = listings[_tokenId][msg.sender];
+        Listing storage listing = listings[_tokenId];
         listing.quantityLeft -= order.quantity;
         // call escrow 
         emit OrderAccepted(_buyer, _tokenId, order.quantity, order.orderType);
     }
-
-    function cancelOrder(uint256 _tokenId) external orderExist(_tokenId, msg.sender) {
+// TODO
+    function cancelOrder(uint256 _tokenId) external nonReentrant orderExist(_tokenId, msg.sender) {
        // return money 
        // add logic to if to return money
+       // increase quantity 
         delete orders[_tokenId][msg.sender];
         emit OrderCanceled(msg.sender, _tokenId);
     }
@@ -186,5 +252,12 @@ IERC721 public nftAddress = IERC721(address(this));
 
      function _getTime() internal view  returns (uint256) {
         return block.timestamp;
+    }
+
+    function _checkListing(uint _tokenId, uint _quantity) internal view {
+         Listing memory listing = listings[_tokenId];
+        require(listing.listingTime > 0, NotListed());
+         require(listing.owner != address(0) ,NotListed());
+        require(listing.quantityLeft >= _quantity , InvalidQuantity());
     }
 }
