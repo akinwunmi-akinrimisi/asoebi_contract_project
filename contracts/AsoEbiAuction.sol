@@ -222,12 +222,6 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
 
         require(auction.startTime > 0, CancelAuction_AuctionDoesNotExist());
 
-        // Check if the auction has already ended
-        // require(
-        //     block.timestamp < auction.endTime,
-        //     'CancelAuction_AuctionEnded'
-        // );
-
         // refund  highest bidder
         HighestBid storage highestBid = highestBids[_nftAddress][_tokenId];
         uint256 bid = highestBid.bid;
@@ -365,6 +359,10 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         uint256 _minimumSellingPrice
     ) external {
         Auction storage auction = auctions[_nftAddress][_tokenId];
+
+        // Ensure that the auction has not ended
+        require(block.timestamp < auction.endTime, 'AuctionAlreadyEnded');
+
         _checkAuction(_nftAddress, _tokenId);
         auction.minimumSellingPrice = _minimumSellingPrice;
         emit UpdatedAuctionMinimumSellingPrice(
@@ -405,7 +403,11 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         _checkAuction(_nftAddress, _tokenId);
 
         // xheck if auction has not ended
-        require(_getTime() < auction.endTime, AuctionAlreadyEnded());
+        // require(_getTime() < auction.endTime, AuctionAlreadyEnded());
+
+        // Ensure that the auction has not ended
+        require(block.timestamp < auction.endTime, 'AuctionAlreadyEnded');
+
         require(
             auction.startTime < _endTimestamp,
             InvalidEndTImeTime(_endTimestamp)

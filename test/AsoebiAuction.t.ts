@@ -857,4 +857,148 @@ describe('AsoEbiAution', function () {
       ).to.be.revertedWithCustomError(asoEbiAution, 'WithDrawBid_TimeLock');
     });
   });
+
+  describe('updateAuction', function () {
+    it('should update the start time successfully', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600; // Auction starts in 1 hour
+      const newStartTime = startTime + 7200; // Update start time to 2 hours from now
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Update the start time
+      await expect(
+        asoEbiAution
+          .connect(seller)
+          .updateAuctionStartTime(mockNFT.target, TOKEN_ID, newStartTime)
+      )
+        .to.emit(asoEbiAution, 'UpdatedAuctionStartTime')
+        .withArgs(mockNFT.target, TOKEN_ID, newStartTime);
+
+      const auction = await asoEbiAution.getAuction(mockNFT.target, TOKEN_ID);
+      expect(auction._startTime).to.equal(newStartTime);
+    });
+
+    it('should revert if auction has already started when updating start time', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const newStartTime = startTime + 7200;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Move time past the original start time
+      await time.increase(3601);
+
+      // Try to update the start time after auction has already started
+      await expect(
+        asoEbiAution
+          .connect(seller)
+          .updateAuctionStartTime(mockNFT.target, TOKEN_ID, newStartTime)
+      ).to.be.revertedWithCustomError(asoEbiAution, 'AuctionAlreadyStart');
+    });
+
+    it('should update the end time successfully', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+      const newEndTime = endTime + 3600; // Update end time to 1 hour later
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Update the end time
+      await expect(
+        asoEbiAution
+          .connect(seller)
+          .updateAuctionEndTime(mockNFT.target, TOKEN_ID, newEndTime)
+      )
+        .to.emit(asoEbiAution, 'UpdatedAuctionEndTime')
+        .withArgs(mockNFT.target, TOKEN_ID, newEndTime);
+
+      const auction = await asoEbiAution.getAuction(mockNFT.target, TOKEN_ID);
+      expect(auction._endTime).to.equal(newEndTime);
+    });
+
+    it('should update the minimum selling price successfully', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+      const newMinimumSellingPrice = ethers.parseEther('2'); // Update selling price to 2 ETH
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Update the minimum selling price
+      await expect(
+        asoEbiAution
+          .connect(seller)
+          .updateAuctionMinimumSellingPrice(
+            mockNFT.target,
+            TOKEN_ID,
+            newMinimumSellingPrice
+          )
+      )
+        .to.emit(asoEbiAution, 'UpdatedAuctionMinimumSellingPrice')
+        .withArgs(mockNFT.target, TOKEN_ID, newMinimumSellingPrice);
+
+      const auction = await asoEbiAution.getAuction(mockNFT.target, TOKEN_ID);
+      expect(auction.minimumSellingPrice).to.equal(newMinimumSellingPrice);
+    });
+  });
 });
