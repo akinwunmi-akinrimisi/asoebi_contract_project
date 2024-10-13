@@ -563,4 +563,144 @@ describe('AsoEbiAution', function () {
       ).to.be.revertedWithCustomError(asoEbiAution, 'InvalidWinningBid');
     });
   });
+
+  describe('cancelAuction', function () {
+    it('should cancel the auction successfully', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Seller cancels the auction
+      await expect(
+        asoEbiAution.connect(seller).cancelAuction(mockNFT.target, TOKEN_ID)
+      )
+        .to.emit(asoEbiAution, 'AuctionCancelled')
+        .withArgs(mockNFT.target, TOKEN_ID);
+
+      // Check if auction has been deleted
+      const auction = await asoEbiAution.getAuction(mockNFT.target, TOKEN_ID);
+      expect(auction._owner).to.equal(ethers.ZeroAddress); // Auction should be removed
+    });
+
+    it('should revert if not the auction owner', async function () {
+      const { asoEbiAution, mockNFT, buyer, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Try to cancel the auction as a buyer (non-owner)
+      await expect(
+        asoEbiAution.connect(buyer).cancelAuction(mockNFT.target, TOKEN_ID)
+      ).to.be.revertedWithCustomError(
+        asoEbiAution,
+        'CancelAuction_InvalidOwner'
+      );
+    });
+
+    it('should allow canceling the auction after the end time but before finalization', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Move time past the end time
+      await time.increaseTo(endTime + 1);
+
+      await expect(
+        asoEbiAution.connect(seller).cancelAuction(mockNFT.target, TOKEN_ID)
+      )
+        .to.emit(asoEbiAution, 'AuctionCancelled')
+        .withArgs(mockNFT.target, TOKEN_ID);
+    });
+
+    it('should revert if auction is finalized', async function () {
+      const { asoEbiAution, mockNFT, seller, bidder } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Move time past the start time
+      await time.increase(3601);
+
+      // Bidder places a bid
+      await asoEbiAution
+        .connect(bidder)
+        .placeBid(mockNFT.target, TOKEN_ID, { value: BID_AMOUNT });
+
+      await time.increase(86401);
+
+      // Finalize the auction
+      await asoEbiAution
+        .connect(seller)
+        .finalizeAuction(mockNFT.target, TOKEN_ID);
+
+      await expect(
+        asoEbiAution.connect(seller).cancelAuction(mockNFT.target, TOKEN_ID)
+      ).to.be.revertedWithCustomError(
+        asoEbiAution,
+        'CancelAuction_AuctionFinaliZed'
+      );
+    });
+  });
 });
