@@ -228,16 +228,18 @@ escrowAddress= _escrowAddress;
             require(msg.value >= auction.minimumBid,InvalidBid());
         }
 
+        
         require(msg.value > highestBid.bid, PlaceBid_DidNotOutBid());
-
-        if (highestBid.bidder != address(0)) {
-            _refundHighestBidder(_nftAddress, _tokenId, highestBid.bidder, highestBid.bid);
-        }
-
-        // set new bidder
+        address payable previousBidder = highestBid.bidder;
+        uint256 prevBid =   highestBid.bid;
+                // set new bidder
         highestBid.bidder = payable(msg.sender);
         highestBid.bid = msg.value;
-        highestBid.lastBidTime = _getTime();
+
+        if (previousBidder != address(0)) {
+            _refundHighestBidder(_nftAddress, _tokenId, previousBidder, prevBid);
+        }
+    
 
         emit BidPlaced(_nftAddress, _tokenId, msg.sender, msg.value);
     }
