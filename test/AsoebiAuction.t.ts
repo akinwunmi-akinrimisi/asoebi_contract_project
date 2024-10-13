@@ -402,6 +402,7 @@ describe('AsoEbiAution', function () {
       const startTime = (await time.latest()) + 3600;
       const endTime = startTime + 86400;
 
+      // Seller creates the auction
       await asoEbiAution
         .connect(seller)
         .createAuction(
@@ -414,10 +415,11 @@ describe('AsoEbiAution', function () {
           true
         );
 
+      // Move time past the start time
       await time.increase(3601);
-      await asoEbiAution.connect(bidder).placeBid(mockNFT.target, TOKEN_ID, {
-        value: ethers.parseEther('1.5'),
-      });
+      await asoEbiAution
+        .connect(bidder)
+        .placeBid(mockNFT.target, TOKEN_ID, { value: BID_AMOUNT });
       await time.increase(86401);
 
       await expect(
@@ -429,7 +431,7 @@ describe('AsoEbiAution', function () {
           mockNFT.target,
           TOKEN_ID,
           bidder.address,
-          ethers.parseEther('1.5')
+          BID_AMOUNT
         );
 
       const auction = await asoEbiAution.getAuction(mockNFT.target, TOKEN_ID);
@@ -444,6 +446,7 @@ describe('AsoEbiAution', function () {
       const startTime = (await time.latest()) + 3600;
       const endTime = startTime + 86400;
 
+      // Seller creates the auction
       await asoEbiAution
         .connect(seller)
         .createAuction(
@@ -463,6 +466,101 @@ describe('AsoEbiAution', function () {
         asoEbiAution,
         'CheckAuction_InvalidOwner'
       );
+    });
+
+    it('should revert if auction is still active', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Try to finalize before the auction has ended
+      await time.increase(3601);
+      await expect(
+        asoEbiAution.connect(seller).finalizeAuction(mockNFT.target, TOKEN_ID)
+      ).to.be.revertedWithCustomError(asoEbiAution, 'AuctionIsActive');
+    });
+
+    it('should revert if no bids placed', async function () {
+      const { asoEbiAution, mockNFT, seller } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution
+        .connect(seller)
+        .createAuction(
+          mockNFT.target,
+          TOKEN_ID,
+          MINIMUM_SELLING_PRICE,
+          startTime,
+          endTime,
+          0,
+          true
+        );
+
+      // Move time past the end time
+      await time.increaseTo(endTime + 1); // Ensure the end time has passed
+
+      // Try to finalize without any bids placed
+      await expect(
+        asoEbiAution.connect(seller).finalizeAuction(mockNFT.target, TOKEN_ID)
+      ).to.be.revertedWithCustomError(asoEbiAution, 'NoBid');
+    });
+
+    it('should revert if winning bid is below minimum selling price', async function () {
+      const { asoEbiAution, mockNFT, seller, bidder } = await loadFixture(
+        deployContractsFixture
+      );
+
+      const startTime = (await time.latest()) + 3600;
+      const endTime = startTime + 86400;
+
+      // Seller creates the auction
+      await asoEbiAution.connect(seller).createAuction(
+        mockNFT.target,
+        TOKEN_ID,
+        MINIMUM_SELLING_PRICE,
+        startTime,
+        endTime,
+        0,
+        false // minimum bid is not set to the minimum selling price
+      );
+
+      // Move time past the start time
+      await time.increase(3601);
+
+      // Place a bid that meets the minimum bid but is lower than the minimum selling price
+      const lowBid = ethers.parseEther('0.9');
+      await asoEbiAution
+        .connect(bidder)
+        .placeBid(mockNFT.target, TOKEN_ID, { value: lowBid });
+
+      // Move time past the end time
+      await time.increaseTo(endTime + 1);
+
+      // Try to finalize (should revert due to low winning bid)
+      await expect(
+        asoEbiAution.connect(seller).finalizeAuction(mockNFT.target, TOKEN_ID)
+      ).to.be.revertedWithCustomError(asoEbiAution, 'InvalidWinningBid');
     });
   });
 });
