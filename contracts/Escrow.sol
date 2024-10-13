@@ -11,7 +11,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * @author Damboy0
  * @dev Handles escrow for orders and auctions.
  */
-contract Escrow is ReentrancyGuard,IERC721Receiver {
+contract Escrow is ReentrancyGuard, IERC721Receiver {
     address public owner;
     uint256 public feePercentage;
     address public auctionContract;
@@ -47,8 +47,7 @@ contract Escrow is ReentrancyGuard,IERC721Receiver {
     event ReleaseForAuction(address indexed nftAddress, uint256 indexed tokenId, address seller);
     event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
 
-
-    modifier onlyOwner {
+    modifier onlyOwner() {
         require(msg.sender == owner, "Escrow: not owner");
         _;
     }
@@ -141,19 +140,16 @@ contract Escrow is ReentrancyGuard,IERC721Receiver {
         emit ReleaseForAuction(_nftAddress, _tokenId, finalizedAuction.seller);
     }
 
-
-
-    function updateAuctionContract(address _auctionContract) onlyOwner external{
-            auctionContract = _auctionContract;
+    function updateAuctionContract(address _auctionContract) external onlyOwner {
+        auctionContract = _auctionContract;
     }
 
     // Function to handle receiving an ERC-721 token
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external override returns (bytes4) {
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data)
+        external
+        override
+        returns (bytes4)
+    {
         emit NFTReceived(operator, from, tokenId, data);
         return this.onERC721Received.selector;
     }
