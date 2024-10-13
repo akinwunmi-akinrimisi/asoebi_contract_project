@@ -7,10 +7,16 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 
 interface IEscrow {
-     function depositForAuction(address _nftAddress,uint _tokenId ,address payable _seller, address _winner , uint _winningbid) external payable;
+    function depositForAuction(
+        address _nftAddress,
+        uint256 _tokenId,
+        address payable _seller,
+        address _winner,
+        uint256 _winningbid
+    ) external payable;
 }
 
-contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard ,IERC721Receiver{
+contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
     // ===== ERROR ====
     error CreateAuction_InvalidOwner(address sender);
     error CreateAuction_InvalidSellingPrice();
@@ -67,7 +73,7 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard ,IERC721Receiver{
     );
 
     event AuctionCancelled(address indexed nftAddress, uint256 indexed tokenId);
- event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
+    event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
 
     // ======  USER DEFINED VALUES =====
 
@@ -103,13 +109,12 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard ,IERC721Receiver{
 
     // Nft Address -> Token ID -> HighestBId Struct
     mapping(address => mapping(uint256 => HighestBid)) public highestBids;
-address public escrowAddress ;
+    address public escrowAddress;
 
+    constructor(address _escrowAddress) {
+        escrowAddress = _escrowAddress;
+    }
 
- constructor (address _escrowAddress) {
-
-escrowAddress= _escrowAddress;
-}
     function createAuction(
         address _nftAddress,
         uint256 _tokenId,
@@ -198,20 +203,18 @@ escrowAddress= _escrowAddress;
 
         delete highestBids[_nftAddress][_tokenId];
 
-       
-
         // transfer the NFT to the escrow contract
-    IERC721(_nftAddress).safeTransferFrom(address(this), escrowAddress, _tokenId);
+        IERC721(_nftAddress).safeTransferFrom(address(this), escrowAddress, _tokenId);
 
-    // call depositForAuction from the escrow contract, sending the winning bid 
-    IEscrow escrowContract = IEscrow(escrowAddress);
-    escrowContract.depositForAuction{value: winningBid}(
-        _nftAddress,
-        _tokenId,
-        payable(auction.owner),  //seller address
-        winner,                  // winner address
-        winningBid               // Winning bid amount
-    ); 
+        // call depositForAuction from the escrow contract, sending the winning bid
+        IEscrow escrowContract = IEscrow(escrowAddress);
+        escrowContract.depositForAuction{value: winningBid}(
+            _nftAddress,
+            _tokenId,
+            payable(auction.owner), //seller address
+            winner, // winner address
+            winningBid // Winning bid amount
+        );
         emit AuctionFinalized(auction.owner, _nftAddress, _tokenId, winner, winningBid);
     }
 
@@ -225,21 +228,19 @@ escrowAddress= _escrowAddress;
         require(_getTime() <= auction.endTime && _getTime() >= auction.startTime, PlaceBid_InvaildAuction());
         // for the first bidder
         if (auction.minimumbidIsMinSellingPrice) {
-            require(msg.value >= auction.minimumBid,InvalidBid());
+            require(msg.value >= auction.minimumBid, InvalidBid());
         }
 
-        
         require(msg.value > highestBid.bid, PlaceBid_DidNotOutBid());
         address payable previousBidder = highestBid.bidder;
-        uint256 prevBid =   highestBid.bid;
-                // set new bidder
+        uint256 prevBid = highestBid.bid;
+        // set new bidder
         highestBid.bidder = payable(msg.sender);
         highestBid.bid = msg.value;
 
         if (previousBidder != address(0)) {
             _refundHighestBidder(_nftAddress, _tokenId, previousBidder, prevBid);
         }
-    
 
         emit BidPlaced(_nftAddress, _tokenId, msg.sender, msg.value);
     }
@@ -303,10 +304,9 @@ escrowAddress= _escrowAddress;
     }
 
     // ======  Owner's Function =====
-function updateEscrowAddress(address _escrowAddress) external onlyOwner{
-    escrowAddress =_escrowAddress;
-    
-}
+    function updateEscrowAddress(address _escrowAddress) external onlyOwner {
+        escrowAddress = _escrowAddress;
+    }
     // ======  View Function =====
 
     function getAuction(address _nftAddress, uint256 _tokenId)
@@ -345,7 +345,7 @@ function updateEscrowAddress(address _escrowAddress) external onlyOwner{
         return (highestBid.bidder, highestBid.bid, highestBid.lastBidTime);
     }
 
-    function _getTime() internal view virtual returns (uint256) {
+    function _getTime() internal view  returns (uint256) {
         return block.timestamp;
     }
 
@@ -372,15 +372,12 @@ function updateEscrowAddress(address _escrowAddress) external onlyOwner{
         require(auction.endTime > 0, CheckAuction_AuctionDoesNotExist());
     }
 
-
-
     // Function to handle receiving an ERC-721 token
-    function onERC721Received(
-        address operator,
-        address from,
-        uint256 tokenId,
-        bytes calldata data
-    ) external override returns (bytes4) {
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data)
+        external
+        override
+        returns (bytes4)
+    {
         emit NFTReceived(operator, from, tokenId, data);
         return this.onERC721Received.selector;
     }
