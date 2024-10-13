@@ -7,6 +7,16 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+interface IEscrow {
+    function depositForAuction(
+        address _nftAddress,
+        uint256 _tokenId,
+        address payable _seller,
+        address _winner,
+        uint256 _winningbid
+    ) external payable;
+    function depositForOrder(address seller, uint256 amount, address buyer) external payable ;
+}
 contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.sender), ReentrancyGuard {
     // ===== ERROR ====
     error  NotANewUser(address );
@@ -22,6 +32,7 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
     error InsufficientFunds();
     error NotListingOwner();
     error NotVaildBuyer();
+    error WithdrawFailed( );
     
 
     event ItemListed(
@@ -98,6 +109,7 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
     }
 
 IERC721 public nftAddress = IERC721(address(this));
+address public escrowAddress;
     mapping(address => User) public users;
     // tokenid  -> Listing
     mapping(uint256 => Listing) public listings;
@@ -145,6 +157,13 @@ IERC721 public nftAddress = IERC721(address(this));
         require(order.quantity == 0 || order.timeofOrder == 0,OrderDoesExist());
         _;
     }
+
+
+
+    constructor(address _escrowAddress) {
+        escrowAddress = _escrowAddress;
+    }
+
 
     function registerUser(string memory _displayName,RoleType _roleType) external {
         require(users[msg.sender].isRegistered == false, NotANewUser(msg.sender));
@@ -226,24 +245,38 @@ IERC721 public nftAddress = IERC721(address(this));
 
         emit OrderCreated(msg.sender, _tokenId, _quantity, OrderType.Fabric);
     }
-    //TODO 
+
     function acceptOrder(uint256 _tokenId, address _buyer) external nonReentrant isListed(_tokenId, msg.sender) orderExist(_tokenId, _buyer) {
         Order storage order = orders[_tokenId][_buyer];
         order.orderStatus = OrderStatus.Accepted;
         Listing storage listing = listings[_tokenId];
         listing.quantityLeft -= order.quantity;
         // call escrow 
+         IEscrow escrowContract = IEscrow(escrowAddress);
+
+         escrowContract.depositForOrder{value : order.totalPrice }(msg.sender, order.totalPrice, _buyer);
+
         emit OrderAccepted(_buyer, _tokenId, order.quantity, order.orderType);
     }
-// TODO
+
     function cancelOrder(uint256 _tokenId) external nonReentrant orderExist(_tokenId, msg.sender) {
-       // return money 
-       // add logic to if to return money
-       // increase quantity 
-        delete orders[_tokenId][msg.sender];
+
+        Order memory order = orders[_tokenId][msg.sender];
+        uint256 amount = order.totalPrice;
+         delete orders[_tokenId][msg.sender];
+         (bool success,) = msg.sender.call{value: amount}("");
+         require(success , WithdrawFailed());
+      
         emit OrderCanceled(msg.sender, _tokenId);
     }
     function mint() external {}
+
+
+
+    // ======  Owner's Function =====
+    function updateEscrowAddress(address _escrowAddress) external onlyOwner {
+        escrowAddress = _escrowAddress;
+    }
 
 
     function _isOwner (uint _tokenId,address _owner) internal view {
