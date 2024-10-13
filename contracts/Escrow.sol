@@ -11,13 +11,20 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * @author Damboy0
  * @dev Handles escrow for orders and auctions.
  */
-contract Escrow is ReentrancyGuard, IERC721Receiver {
-    address public owner;
+contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
+    address public feeRecipient; //change ownwers to feeRecipient
     uint256 public feePercentage;
     address public auctionContract;
 
     struct FinalizedAuction {
         address payable seller; // can be fabric seller or designer
+        address winner;
+        uint256 winningbid;
+        bool isReceived;
+    }
+
+    struct FinalizedOrder {
+        address payable seller;
         address winner;
         uint256 winningbid;
         bool isReceived;
@@ -47,17 +54,14 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
     event ReleaseForAuction(address indexed nftAddress, uint256 indexed tokenId, address seller);
     event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Escrow: not owner");
-        _;
-    }
-
+    // ===== CONSTRUCTOR =====
     /**
      * @dev Constructor.
      * @param _feePercentage The fee percentage.
      */
-    constructor(uint256 _feePercentage) {
-        owner = msg.sender;
+    constructor(uint256 _feePercentage, address _feeRecipient) {
+        feeRecipient = _feeRecipient;
+        // owner = msg.sender;
         feePercentage = _feePercentage;
     }
 
@@ -108,7 +112,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
         (bool success,) = payable(seller).call{value: amountToRelease}("");
         require(success, "Escrow: failed to release funds");
 
-        (bool success2,) = payable(owner).call{value: fee}("");
+        (bool success2,) = payable(feeRecipient).call{value: fee}("");
         require(success2, "Escrow: failed to release fee");
 
         emit ReleaseForOrder(buyer, seller, amount);
@@ -134,7 +138,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
 
         require(success, "Escrow: failed to release fund");
 
-        (bool success2,) = payable(owner).call{value: fee}("");
+        (bool success2,) = payable(feeRecipient).call{value: fee}("");
         require(success2, "Escrow: failed to release fee");
 
         emit ReleaseForAuction(_nftAddress, _tokenId, finalizedAuction.seller);
