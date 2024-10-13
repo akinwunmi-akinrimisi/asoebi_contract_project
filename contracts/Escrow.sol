@@ -23,12 +23,12 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
         bool isReceived;
     }
 
-    struct FinalizedOrder {
-        address payable seller;
-        address winner;
-        uint256 winningbid;
-        bool isReceived;
-    }
+    // struct FinalizedOrder {
+    //     address payable seller;
+    //     address winner;
+    //     uint256 winningbid;
+    //     bool isReceived;
+    // }
 
     // Mapping of escrowed funds for orders
     mapping(address => mapping(address => uint256)) public orderEscrow;
