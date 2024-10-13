@@ -10,7 +10,6 @@ describe("AsoEbiAution", function () {
     let seller: SignerWithAddress;
     let buyer: SignerWithAddress;
     let bidder: SignerWithAddress;
-
     const TOKEN_ID = 1;
     const MINIMUM_SELLING_PRICE = ethers.parseEther("1");
     const BID_AMOUNT = ethers.parseEther("1.5");
