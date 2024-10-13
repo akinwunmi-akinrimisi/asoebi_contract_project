@@ -11,10 +11,11 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
  * @author Damboy0
  * @dev Handles escrow for orders and auctions.
  */
-contract Escrow is ReentrancyGuard, IERC721Receiver {
-    address public owner;
+contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
+    address public feeRecipient; //change ownwers to feeRecipient
     uint256 public feePercentage;
     address public auctionContract;
+    address public marketPlaceContract;
 
     struct FinalizedAuction {
         address payable seller; // can be fabric seller or designer
@@ -23,20 +24,19 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
         bool isReceived;
     }
 
+       struct FinalizedOrder {
+        address payable seller;
+        address buyer;
+        uint256 amount;
+        bool isReceived;
+    }
+
     // Mapping of escrowed funds for orders
-    mapping(address => mapping(address => uint256)) public orderEscrow;
-
-    // // Mapping of escrowed funds for auctions
-    // mapping (address => mapping (address => uint)) public auctionEscrow;
-
-    // Mapping of escrowed NFTs for auctions
-    mapping(address => mapping(address => address[])) public nftEscrow;
+     mapping(address => mapping(address => FinalizedOrder)) public orderEscrow;
 
     // Mapping of escrowed amounts for auctions
     mapping(address => mapping(uint256 => FinalizedAuction)) public auctionEscrow;
 
-    // Mapping of escrowed token addresses for auctions
-    mapping(address => mapping(address => address[])) public tokenEscrow;
 
     // ===== EVENTS =====
     event DepositForOrder(address indexed buyer, address indexed seller, uint256 amount);
@@ -46,18 +46,17 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
     event ReleaseForOrder(address indexed buyer, address indexed seller, uint256 amount);
     event ReleaseForAuction(address indexed nftAddress, uint256 indexed tokenId, address seller);
     event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
+    event FeeRecipientUpdated(address indexed newFeeRecipient);
+    event FeePercentageUpdated(uint256 newFeePercentage);
 
-    modifier onlyOwner() {
-        require(msg.sender == owner, "Escrow: not owner");
-        _;
-    }
-
+    // ===== CONSTRUCTOR =====
     /**
      * @dev Constructor.
      * @param _feePercentage The fee percentage.
      */
-    constructor(uint256 _feePercentage) {
-        owner = msg.sender;
+    constructor(uint256 _feePercentage, address _feeRecipient) {
+        feeRecipient = _feeRecipient;
+        // owner = msg.sender;
         feePercentage = _feePercentage;
     }
 
@@ -65,9 +64,16 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
      * @dev Deposit funds for an order.
      */
     function depositForOrder(address seller, uint256 amount) external payable {
-        require(msg.value == amount, "Escrow: value mismatch");
+         require(msg.value == amount, "Escrow: value mismatch");
+         require(msg.sender == auctionContract, "Escrow: did not use marketplace contract");
 
-        orderEscrow[msg.sender][seller] += amount;
+
+        orderEscrow[msg.sender][seller] = FinalizedOrder({
+            seller: payable(seller),
+            buyer: msg.sender,
+            amount: amount,
+            isReceived: false
+        });
 
         emit DepositForOrder(msg.sender, seller, amount);
     }
@@ -96,22 +102,23 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
      * @dev Release funds for an order.
      */
     function releaseForOrder(address buyer, address seller) external {
-        uint256 amount = orderEscrow[buyer][seller];
+        FinalizedOrder storage order = orderEscrow[buyer][seller];
 
-        require(amount > 0, "Escrow: no funds to release");
+        require(order.amount > 0, "Escrow: no funds to release");
+        require(order.isReceived == false, "Escrow: order already released");
 
-        orderEscrow[buyer][seller] = 0;
+        order.isReceived = true;
 
-        uint256 fee = (amount * feePercentage) / 100;
-        uint256 amountToRelease = amount - fee;
+        uint256 fee = (order.amount * feePercentage) / 100;
+        uint256 amountToRelease = order.amount - fee;
 
-        (bool success,) = payable(seller).call{value: amountToRelease}("");
+        (bool success,) = order.seller.call{value: amountToRelease}("");
         require(success, "Escrow: failed to release funds");
 
-        (bool success2,) = payable(owner).call{value: fee}("");
+        (bool success2,) = payable(feeRecipient).call{value: fee}("");
         require(success2, "Escrow: failed to release fee");
 
-        emit ReleaseForOrder(buyer, seller, amount);
+        emit ReleaseForOrder(buyer, seller, order.amount);
     }
 
     /**
@@ -134,14 +141,38 @@ contract Escrow is ReentrancyGuard, IERC721Receiver {
 
         require(success, "Escrow: failed to release fund");
 
-        (bool success2,) = payable(owner).call{value: fee}("");
+        (bool success2,) = payable(feeRecipient).call{value: fee}("");
         require(success2, "Escrow: failed to release fee");
 
         emit ReleaseForAuction(_nftAddress, _tokenId, finalizedAuction.seller);
     }
 
+
+     /**
+     * @dev Owner can update the fee recipient.
+     * @param _newFeeRecipient The new fee recipient address.
+     */
+    function updateFeeRecipient(address _newFeeRecipient) external onlyOwner {
+        require(_newFeeRecipient != address(0), "Escrow: invalid address");
+        feeRecipient = _newFeeRecipient;
+        emit FeeRecipientUpdated(_newFeeRecipient);
+    }
+
+    /**
+     * @dev Owner can update the fee percentage.
+     * @param _newFeePercentage The new fee percentage.
+     */
+    function updateFeePercentage(uint256 _newFeePercentage) external onlyOwner {
+        require(_newFeePercentage <= 100, "Escrow: invalid fee percentage");
+        feePercentage = _newFeePercentage;
+        emit FeePercentageUpdated(_newFeePercentage);
+    }
+
     function updateAuctionContract(address _auctionContract) external onlyOwner {
         auctionContract = _auctionContract;
+    }
+ function updateMarketPlaceContract(address _marketPlaceContract) external onlyOwner {
+        marketPlaceContract = _marketPlaceContract;
     }
 
     // Function to handle receiving an ERC-721 token
