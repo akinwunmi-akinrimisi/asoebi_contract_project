@@ -15,6 +15,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
     address public feeRecipient; //change ownwers to feeRecipient
     uint256 public feePercentage;
     address public auctionContract;
+    address public marketPlaceContract;
 
     struct FinalizedAuction {
         address payable seller; // can be fabric seller or designer
@@ -64,6 +65,8 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
      */
     function depositForOrder(address seller, uint256 amount) external payable {
          require(msg.value == amount, "Escrow: value mismatch");
+         require(msg.sender == auctionContract, "Escrow: did not use marketplace contract");
+
 
         orderEscrow[msg.sender][seller] = FinalizedOrder({
             seller: payable(seller),
@@ -167,6 +170,9 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
 
     function updateAuctionContract(address _auctionContract) external onlyOwner {
         auctionContract = _auctionContract;
+    }
+ function updateMarketPlaceContract(address _marketPlaceContract) external onlyOwner {
+        marketPlaceContract = _marketPlaceContract;
     }
 
     // Function to handle receiving an ERC-721 token
