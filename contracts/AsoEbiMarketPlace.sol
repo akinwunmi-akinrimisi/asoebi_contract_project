@@ -15,6 +15,7 @@ interface IEscrow {
         address _winner,
         uint256 _winningbid
     ) external payable;
+    function depositForOrder(address seller, uint256 amount, address buyer) external payable ;
 }
 contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.sender), ReentrancyGuard {
     // ===== ERROR ====
@@ -244,7 +245,7 @@ address public escrowAddress;
 
         emit OrderCreated(msg.sender, _tokenId, _quantity, OrderType.Fabric);
     }
-    //TODO 
+
     function acceptOrder(uint256 _tokenId, address _buyer) external nonReentrant isListed(_tokenId, msg.sender) orderExist(_tokenId, _buyer) {
         Order storage order = orders[_tokenId][_buyer];
         order.orderStatus = OrderStatus.Accepted;
@@ -252,7 +253,8 @@ address public escrowAddress;
         listing.quantityLeft -= order.quantity;
         // call escrow 
          IEscrow escrowContract = IEscrow(escrowAddress);
-         
+
+         escrowContract.depositForOrder{value : order.totalPrice }(msg.sender, order.totalPrice, _buyer);
 
         emit OrderAccepted(_buyer, _tokenId, order.quantity, order.orderType);
     }

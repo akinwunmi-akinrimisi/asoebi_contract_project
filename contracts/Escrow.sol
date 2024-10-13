@@ -63,19 +63,19 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
     /**
      * @dev Deposit funds for an order.
      */
-    function depositForOrder(address seller, uint256 amount) external payable {
+    function depositForOrder(address seller, uint256 amount, address buyer) external payable {
          require(msg.value == amount, "Escrow: value mismatch");
          require(msg.sender == auctionContract, "Escrow: did not use marketplace contract");
 
 
-        orderEscrow[msg.sender][seller] = FinalizedOrder({
+        orderEscrow[buyer][seller] = FinalizedOrder({
             seller: payable(seller),
-            buyer: msg.sender,
+            buyer: buyer,
             amount: amount,
             isReceived: false
         });
 
-        emit DepositForOrder(msg.sender, seller, amount);
+        emit DepositForOrder(buyer, seller, amount);
     }
 
     /**
@@ -103,7 +103,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
      */
     function releaseForOrder(address buyer, address seller) external {
         FinalizedOrder storage order = orderEscrow[buyer][seller];
-
+  require(msg.sender == order.buyer , "Escrow: not buyer");
         require(order.amount > 0, "Escrow: no funds to release");
         require(order.isReceived == false, "Escrow: order already released");
 
