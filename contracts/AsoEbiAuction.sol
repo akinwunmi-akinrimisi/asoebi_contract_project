@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.27;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {IERC721} from "@openzeppelin/contracts/interfaces/IERC721.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC721Receiver} from "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
+import {Ownable} from '@openzeppelin/contracts/access/Ownable.sol';
+import {IERC721} from '@openzeppelin/contracts/interfaces/IERC721.sol';
+import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import {IERC721Receiver} from '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 
 interface IEscrow {
     function depositForAuction(
@@ -47,20 +47,49 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
 
     // ======  Events =====
 
-    event AuctionCreated(address indexed nftAddress, uint256 indexed tokenId, AuctionType auctionTye);
-    event BidPlaced(address indexed nftAddress, uint256 indexed tokenId, address indexed bidder, uint256 bid);
+    event AuctionCreated(
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        AuctionType auctionTye
+    );
+    event BidPlaced(
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        address indexed bidder,
+        uint256 bid
+    );
 
-    event BidWithdrawn(address indexed nftAddress, uint256 indexed tokenId, address indexed bidder, uint256 bid);
+    event BidWithdrawn(
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        address indexed bidder,
+        uint256 bid
+    );
 
     // for when the highest bidder change
-    event BidRefunded(address indexed nftAddress, uint256 indexed tokenId, address indexed bidder, uint256 bid);
+    event BidRefunded(
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        address indexed bidder,
+        uint256 bid
+    );
 
-    event UpdatedAuctionEndTime(address indexed nftAddress, uint256 indexed tokenId, uint256 endTime);
+    event UpdatedAuctionEndTime(
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        uint256 endTime
+    );
 
-    event UpdatedAuctionStartTime(address indexed nftAddress, uint256 indexed tokenId, uint256 startTime);
+    event UpdatedAuctionStartTime(
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        uint256 startTime
+    );
 
     event UpdatedAuctionMinimumSellingPrice(
-        address indexed nftAddress, uint256 indexed tokenId, uint256 minimumSellingPrice
+        address indexed nftAddress,
+        uint256 indexed tokenId,
+        uint256 minimumSellingPrice
     );
 
     // oldowner designer or fabric seller
@@ -73,7 +102,12 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
     );
 
     event AuctionCancelled(address indexed nftAddress, uint256 indexed tokenId);
-    event NFTReceived(address operator, address from, uint256 tokenId, bytes data);
+    event NFTReceived(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes data
+    );
 
     // ======  USER DEFINED VALUES =====
 
@@ -125,22 +159,38 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         bool _minimumbidIsMinSellingPrice
     ) external payable {
         // check if nft has been listed
-        require(auctions[_nftAddress][_tokenId].startTime == 0, AuctionAlreadyListed());
+        require(
+            auctions[_nftAddress][_tokenId].startTime == 0,
+            AuctionAlreadyListed()
+        );
 
-        require(msg.sender == IERC721(_nftAddress).ownerOf(_tokenId), CreateAuction_InvalidOwner(msg.sender));
+        require(
+            msg.sender == IERC721(_nftAddress).ownerOf(_tokenId),
+            CreateAuction_InvalidOwner(msg.sender)
+        );
 
         require(_minimumSellingPrice > 0, CreateAuction_InvalidSellingPrice());
 
-        require(_startTime >= _getTime(), CreateAuction_InvalidStartTime(_startTime));
+        require(
+            _startTime >= _getTime(),
+            CreateAuction_InvalidStartTime(_startTime)
+        );
 
-        require(_endTime >= _startTime + 10 minutes, CreateAuction_InvalidEndTime(_endTime));
+        require(
+            _endTime >= _startTime + 10 minutes,
+            CreateAuction_InvalidEndTime(_endTime)
+        );
 
         uint256 minBid = 0;
         if (_minimumbidIsMinSellingPrice) {
             minBid = _minimumSellingPrice;
         }
 
-        IERC721(_nftAddress).safeTransferFrom(msg.sender, address(this), _tokenId);
+        IERC721(_nftAddress).safeTransferFrom(
+            msg.sender,
+            address(this),
+            _tokenId
+        );
 
         auctions[_nftAddress][_tokenId] = Auction({
             owner: msg.sender,
@@ -156,11 +206,17 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         emit AuctionCreated(_nftAddress, _tokenId, _auctionType);
     }
 
-    function cancelAuction(address _nftAddress, uint256 _tokenId) external nonReentrant {
+    function cancelAuction(
+        address _nftAddress,
+        uint256 _tokenId
+    ) external nonReentrant {
         Auction memory auction = auctions[_nftAddress][_tokenId];
         address auctionOwner = auction.owner;
 
-        require(auctionOwner == msg.sender, CancelAuction_InvalidOwner(msg.sender));
+        require(
+            auctionOwner == msg.sender,
+            CancelAuction_InvalidOwner(msg.sender)
+        );
 
         require(auction.finalized == false, CancelAuction_AuctionFinaliZed());
 
@@ -179,12 +235,19 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         }
 
         delete auctions[_nftAddress][_tokenId];
-        IERC721(_nftAddress).safeTransferFrom(address(this), auctionOwner, _tokenId);
+        IERC721(_nftAddress).safeTransferFrom(
+            address(this),
+            auctionOwner,
+            _tokenId
+        );
 
         emit AuctionCancelled(_nftAddress, _tokenId);
     }
 
-    function finalizeAuction(address _nftAddress, uint256 _tokenId) external nonReentrant {
+    function finalizeAuction(
+        address _nftAddress,
+        uint256 _tokenId
+    ) external nonReentrant {
         Auction storage auction = auctions[_nftAddress][_tokenId];
         HighestBid storage highestBid = highestBids[_nftAddress][_tokenId];
 
@@ -204,7 +267,11 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         delete highestBids[_nftAddress][_tokenId];
 
         // transfer the NFT to the escrow contract
-        IERC721(_nftAddress).safeTransferFrom(address(this), escrowAddress, _tokenId);
+        IERC721(_nftAddress).safeTransferFrom(
+            address(this),
+            escrowAddress,
+            _tokenId
+        );
 
         // call depositForAuction from the escrow contract, sending the winning bid
         IEscrow escrowContract = IEscrow(escrowAddress);
@@ -215,17 +282,29 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
             winner, // winner address
             winningBid // Winning bid amount
         );
-        emit AuctionFinalized(auction.owner, _nftAddress, _tokenId, winner, winningBid);
+        emit AuctionFinalized(
+            auction.owner,
+            _nftAddress,
+            _tokenId,
+            winner,
+            winningBid
+        );
     }
 
     // Todo Fix for check effect
-    function placeBid(address _nftAddress, uint256 _tokenId) external payable nonReentrant {
+    function placeBid(
+        address _nftAddress,
+        uint256 _tokenId
+    ) external payable nonReentrant {
         require(msg.value > 0, InvalidBid());
         Auction storage auction = auctions[_nftAddress][_tokenId];
         HighestBid storage highestBid = highestBids[_nftAddress][_tokenId];
         // check that auction has not been finalized
         require(auction.finalized == false, PlaceBid_AuctionAlreadyFinalized());
-        require(_getTime() <= auction.endTime && _getTime() >= auction.startTime, PlaceBid_InvaildAuction());
+        require(
+            _getTime() <= auction.endTime && _getTime() >= auction.startTime,
+            PlaceBid_InvaildAuction()
+        );
         // for the first bidder
         if (auction.minimumbidIsMinSellingPrice) {
             require(msg.value >= auction.minimumBid, InvalidBid());
@@ -239,13 +318,21 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         highestBid.bid = msg.value;
 
         if (previousBidder != address(0)) {
-            _refundHighestBidder(_nftAddress, _tokenId, previousBidder, prevBid);
+            _refundHighestBidder(
+                _nftAddress,
+                _tokenId,
+                previousBidder,
+                prevBid
+            );
         }
 
         emit BidPlaced(_nftAddress, _tokenId, msg.sender, msg.value);
     }
 
-    function withdrawBid(address _nftAddress, uint256 _tokenId) external nonReentrant {
+    function withdrawBid(
+        address _nftAddress,
+        uint256 _tokenId
+    ) external nonReentrant {
         HighestBid storage highestBid = highestBids[_nftAddress][_tokenId];
         address payable highestBidder = highestBid.bidder;
         // check if highest bidder is the msg.sender
@@ -266,16 +353,30 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         emit BidWithdrawn(_nftAddress, _tokenId, highestBidder, bidAmount);
     }
 
-    function updateAuctionMinimumSellingPrice(address _nftAddress, uint256 _tokenId, uint256 _minimumSellingPrice)
-        external
-    {
+    function updateAuctionMinimumSellingPrice(
+        address _nftAddress,
+        uint256 _tokenId,
+        uint256 _minimumSellingPrice
+    ) external {
         Auction storage auction = auctions[_nftAddress][_tokenId];
+
+        // Ensure that the auction has not ended
+        require(block.timestamp < auction.endTime, 'AuctionAlreadyEnded');
+
         _checkAuction(_nftAddress, _tokenId);
         auction.minimumSellingPrice = _minimumSellingPrice;
-        emit UpdatedAuctionMinimumSellingPrice(_nftAddress, _tokenId, _minimumSellingPrice);
+        emit UpdatedAuctionMinimumSellingPrice(
+            _nftAddress,
+            _tokenId,
+            _minimumSellingPrice
+        );
     }
 
-    function updateAuctionStartTime(address _nftAddress, uint256 _tokenId, uint256 _startTime) external {
+    function updateAuctionStartTime(
+        address _nftAddress,
+        uint256 _tokenId,
+        uint256 _startTime
+    ) external {
         Auction storage auction = auctions[_nftAddress][_tokenId];
 
         _checkAuction(_nftAddress, _tokenId);
@@ -283,21 +384,38 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         require(auction.startTime > _getTime(), AuctionAlreadyStart());
 
         // new auction start time should be a least 10 mintues less than aution endtime
-        require(_startTime + 10 minutes < auction.endTime, InvalidStartTime(_startTime));
+        require(
+            _startTime + 10 minutes < auction.endTime,
+            InvalidStartTime(_startTime)
+        );
 
         auction.startTime = _startTime;
         emit UpdatedAuctionStartTime(_nftAddress, _tokenId, _startTime);
     }
 
-    function updateAuctionEndTime(address _nftAddress, uint256 _tokenId, uint256 _endTimestamp) external {
+    function updateAuctionEndTime(
+        address _nftAddress,
+        uint256 _tokenId,
+        uint256 _endTimestamp
+    ) external {
         Auction storage auction = auctions[_nftAddress][_tokenId];
 
         _checkAuction(_nftAddress, _tokenId);
 
         // xheck if auction has not ended
-        require(_getTime() < auction.endTime, AuctionAlreadyEnded());
-        require(auction.startTime < _endTimestamp, InvalidEndTImeTime(_endTimestamp));
-        require(_endTimestamp > _getTime() + 10 minutes, InvalidEndTImeTime(_endTimestamp));
+        // require(_getTime() < auction.endTime, AuctionAlreadyEnded());
+
+        // Ensure that the auction has not ended
+        require(block.timestamp < auction.endTime, 'AuctionAlreadyEnded');
+
+        require(
+            auction.startTime < _endTimestamp,
+            InvalidEndTImeTime(_endTimestamp)
+        );
+        require(
+            _endTimestamp > _getTime() + 10 minutes,
+            InvalidEndTImeTime(_endTimestamp)
+        );
 
         auction.endTime = _endTimestamp;
         emit UpdatedAuctionEndTime(_nftAddress, _tokenId, _endTimestamp);
@@ -309,7 +427,10 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
     }
     // ======  View Function =====
 
-    function getAuction(address _nftAddress, uint256 _tokenId)
+    function getAuction(
+        address _nftAddress,
+        uint256 _tokenId
+    )
         external
         view
         returns (
@@ -336,7 +457,10 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         );
     }
 
-    function getHighestBidder(address _nftAddress, uint256 _tokenId)
+    function getHighestBidder(
+        address _nftAddress,
+        uint256 _tokenId
+    )
         external
         view
         returns (address payable _bidder, uint256 _bid, uint256 _lastBidTime)
@@ -345,7 +469,7 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         return (highestBid.bidder, highestBid.bid, highestBid.lastBidTime);
     }
 
-    function _getTime() internal view  returns (uint256) {
+    function _getTime() internal view returns (uint256) {
         return block.timestamp;
     }
 
@@ -355,16 +479,29 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
         address payable _currentHighestBidder,
         uint256 _currentHighestBid
     ) internal {
-        (bool success,) = _currentHighestBidder.call{value: _currentHighestBid}("");
+        (bool success, ) = _currentHighestBidder.call{
+            value: _currentHighestBid
+        }('');
         require(success, BidRefundFailed(_currentHighestBid));
 
-        emit BidRefunded(_nftAddress, _tokenId, _currentHighestBidder, _currentHighestBid);
+        emit BidRefunded(
+            _nftAddress,
+            _tokenId,
+            _currentHighestBidder,
+            _currentHighestBid
+        );
     }
 
-    function _checkAuction(address _nftAddress, uint256 _tokenId) internal view {
+    function _checkAuction(
+        address _nftAddress,
+        uint256 _tokenId
+    ) internal view {
         Auction memory auction = auctions[_nftAddress][_tokenId];
 
-        require(msg.sender == auction.owner, CheckAuction_InvalidOwner(msg.sender));
+        require(
+            msg.sender == auction.owner,
+            CheckAuction_InvalidOwner(msg.sender)
+        );
 
         // check that auction has not been finalized
         require(!auction.finalized, CheckAuction_AuctionAlreadyFinalized());
@@ -373,11 +510,12 @@ contract AsoEbiAution is Ownable(msg.sender), ReentrancyGuard, IERC721Receiver {
     }
 
     // Function to handle receiving an ERC-721 token
-    function onERC721Received(address operator, address from, uint256 tokenId, bytes calldata data)
-        external
-        override
-        returns (bytes4)
-    {
+    function onERC721Received(
+        address operator,
+        address from,
+        uint256 tokenId,
+        bytes calldata data
+    ) external override returns (bytes4) {
         emit NFTReceived(operator, from, tokenId, data);
         return this.onERC721Received.selector;
     }
