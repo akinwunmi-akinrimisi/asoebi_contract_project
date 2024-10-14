@@ -109,7 +109,7 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
 
     modifier validLister() {
         require(
-            users[msg.sender].roleType == RoleType.FabricSeller || users[msg.sender].roleType == RoleType.Buyer,
+            users[msg.sender].roleType == RoleType.FabricSeller || users[msg.sender].roleType == RoleType.Designer,
             NotVaildLister()
         );
 
