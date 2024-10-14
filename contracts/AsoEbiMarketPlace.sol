@@ -3,6 +3,7 @@
 pragma solidity 0.8.27;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ERC721URIStorage} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -24,6 +25,9 @@ interface IEscrow {
  * @dev A marketplace for listing and ordering NFTs representing fabrics and ready-to-wear items.
  */
 contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.sender), ReentrancyGuard {
+     
+     uint256 private _nextTokenId; // Counter to track tokenIds
+    
     // ===== ERROR ====
     error NotANewUser(address);
     error NotVaildLister();
@@ -151,7 +155,9 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
 
     constructor(address _escrowAddress) {
         escrowAddress = _escrowAddress;
+        _nextTokenId = 0; // Initialize tokenId counter
     }
+
     /**
      * @notice Registers a new user with a display name and role type.
      * @param _displayName The display name of the user.
@@ -317,7 +323,14 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
         emit OrderCanceled(msg.sender, _tokenId);
     }
 
-    function mint() external {}
+     function mint() public validLister {
+        uint256 tokenId = _nextTokenId++;
+        _safeMint(msg.sender, tokenId);
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns (string memory){
+            return super.tokenURI(tokenId); // Returns the stored URI
+        }
 
     // ======  Owner's Function =====
     /**
