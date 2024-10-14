@@ -50,6 +50,7 @@ contract AsoEbiMarketPlace is
     event OrderCreated(address indexed buyer, uint256 tokenId, uint256 quantity, OrderType orderType);
     event OrderAccepted(address indexed buyer, uint256 tokenId, uint256 quantity, OrderType orderType);
     event OrderCanceled(address indexed buyer, uint256 tokenId);
+    event UserRegister(address indexed user, string  displayName,RoleType roleType);
 
     enum RoleType {
         NotRegitered,

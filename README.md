@@ -10,6 +10,12 @@ The Solidity smart contracts that drive the Aso Ebi Marketplace are housed in th
 * Secure, escrow-based payments
 * Chainlink oracles for real-world data integration
 
+### Deployed Addresses
+
+EscrowModule#Escrow - `0x46e806234eE4cd34dD6dFf82074c29B5cA0fD1D0`
+AsoEbiAutionModule#AsoEbiAution - `0xFacB0d8c403Ca9637e6567c25194BD217F5B01bE`
+AsoEbiMarketPlaceModule#AsoEbiMarketPlace - `0x944ce112c2ad3C5cD16886b02B12E29a62dC63E8`
+
 ## Contract Overview ##
 
 1. Marketplace Contract

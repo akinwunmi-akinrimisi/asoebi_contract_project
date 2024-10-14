@@ -108,7 +108,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
 
         order.isReceived = true;
 
-        uint256 fee = (order.amount * feePercentage) / 100;
+        uint256 fee = (order.amount * feePercentage) / 1000;
         uint256 amountToRelease = order.amount - fee;
 
         (bool success,) = order.seller.call{value: amountToRelease}("");
@@ -134,7 +134,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
 
         IERC721(_nftAddress).safeTransferFrom(address(this), finalizedAuction.winner, _tokenId);
 
-        uint256 fee = (finalizedAuction.winningbid * feePercentage) / 100;
+        uint256 fee = (finalizedAuction.winningbid * feePercentage) / 1000;
         uint256 amountToRelease = finalizedAuction.winningbid - fee;
         (bool success,) = finalizedAuction.seller.call{value: amountToRelease}("");
 
