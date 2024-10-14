@@ -9,13 +9,6 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 interface IEscrow {
-    function depositForAuction(
-        address _nftAddress,
-        uint256 _tokenId,
-        address payable _seller,
-        address _winner,
-        uint256 _winningbid
-    ) external payable;
     function depositForOrder(address seller, uint256 amount, address buyer, uint256 newOrderId) external payable;
 }
 
@@ -24,10 +17,14 @@ interface IEscrow {
  * @author Iam0TI
  * @dev A marketplace for listing and ordering NFTs representing fabrics and ready-to-wear items.
  */
-contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.sender), ReentrancyGuard {
-     
-     uint256 private _nextTokenId; // Counter to track tokenIds
-    
+contract AsoEbiMarketPlace is
+    ERC721("AsoEbiMarketPlace", "AEMP"),
+    Ownable(msg.sender),
+    ReentrancyGuard,
+    ERC721URIStorage
+{
+    uint256 public nextTokenId; // Counter to track tokenIds
+
     // ===== ERROR ====
     error NotANewUser(address);
     error NotVaildLister();
@@ -155,7 +152,6 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
 
     constructor(address _escrowAddress) {
         escrowAddress = _escrowAddress;
-        _nextTokenId = 0; // Initialize tokenId counter
     }
 
     /**
@@ -164,7 +160,6 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
      * @param _roleType The role type of the user (FabricSeller, Designer, Buyer).
      * @dev Emits an error if the user is already registered.
      */
-
     function registerUser(string memory _displayName, RoleType _roleType) external {
         require(users[msg.sender].isRegistered == false, NotANewUser(msg.sender));
         users[msg.sender] = User({displayName: _displayName, roleType: _roleType, isRegistered: true});
@@ -323,14 +318,11 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
         emit OrderCanceled(msg.sender, _tokenId);
     }
 
-     function mint() public validLister {
-        uint256 tokenId = _nextTokenId++;
-        _safeMint(msg.sender, tokenId);
+    function mint(string memory uri) external validLister {
+        nextTokenId++;
+        _safeMint(msg.sender, nextTokenId);
+        _setTokenURI(nextTokenId, uri);
     }
-
-    function tokenURI(uint256 tokenId) public view override returns (string memory){
-            return super.tokenURI(tokenId); // Returns the stored URI
-        }
 
     // ======  Owner's Function =====
     /**
@@ -356,4 +348,15 @@ contract AsoEbiMarketPlace is ERC721("AsoEbiMarketPlace", "AEMP"), Ownable(msg.s
         require(listing.owner != address(0), NotListed());
         require(listing.quantityLeft >= _quantity, InvalidQuantity());
     }
+
+    // The following functions are overrides required by Solidity.
+
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721URIStorage) returns (bool) {
+        return super.supportsInterface(interfaceId);
+    }
 }
+        
