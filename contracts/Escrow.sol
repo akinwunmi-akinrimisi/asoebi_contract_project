@@ -24,7 +24,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
         bool isReceived;
     }
 
-       struct FinalizedOrder {
+    struct FinalizedOrder {
         address payable seller;
         address buyer;
         uint256 amount;
@@ -32,11 +32,10 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
     }
 
     // Mapping of escrowed funds for orders
-     mapping(address => mapping(address => FinalizedOrder)) public orderEscrow;
+    mapping(address => mapping(address => FinalizedOrder)) public orderEscrow;
 
     // Mapping of escrowed amounts for auctions
     mapping(address => mapping(uint256 => FinalizedAuction)) public auctionEscrow;
-
 
     // ===== EVENTS =====
     event DepositForOrder(address indexed buyer, address indexed seller, uint256 amount);
@@ -64,16 +63,11 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
      * @dev Deposit funds for an order.
      */
     function depositForOrder(address seller, uint256 amount, address buyer) external payable {
-         require(msg.value == amount, "Escrow: value mismatch");
-         require(msg.sender == auctionContract, "Escrow: did not use marketplace contract");
+        require(msg.value == amount, "Escrow: value mismatch");
+        require(msg.sender == auctionContract, "Escrow: did not use marketplace contract");
 
-
-        orderEscrow[buyer][seller] = FinalizedOrder({
-            seller: payable(seller),
-            buyer: buyer,
-            amount: amount,
-            isReceived: false
-        });
+        orderEscrow[buyer][seller] =
+            FinalizedOrder({seller: payable(seller), buyer: buyer, amount: amount, isReceived: false});
 
         emit DepositForOrder(buyer, seller, amount);
     }
@@ -103,7 +97,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
      */
     function releaseForOrder(address buyer, address seller) external {
         FinalizedOrder storage order = orderEscrow[buyer][seller];
-  require(msg.sender == order.buyer , "Escrow: not buyer");
+        require(msg.sender == order.buyer, "Escrow: not buyer");
         require(order.amount > 0, "Escrow: no funds to release");
         require(order.isReceived == false, "Escrow: order already released");
 
@@ -147,8 +141,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
         emit ReleaseForAuction(_nftAddress, _tokenId, finalizedAuction.seller);
     }
 
-
-     /**
+    /**
      * @dev Owner can update the fee recipient.
      * @param _newFeeRecipient The new fee recipient address.
      */
@@ -171,7 +164,8 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
     function updateAuctionContract(address _auctionContract) external onlyOwner {
         auctionContract = _auctionContract;
     }
- function updateMarketPlaceContract(address _marketPlaceContract) external onlyOwner {
+
+    function updateMarketPlaceContract(address _marketPlaceContract) external onlyOwner {
         marketPlaceContract = _marketPlaceContract;
     }
 
