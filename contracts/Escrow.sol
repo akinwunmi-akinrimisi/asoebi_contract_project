@@ -32,7 +32,7 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
     }
 
     // Mapping of escrowed funds for orders
-    mapping(address => mapping(address => FinalizedOrder)) public orderEscrow;
+    mapping(address => mapping(address => mapping(uint256 => FinalizedOrder))) public orderEscrow;
 
     // Mapping of escrowed amounts for auctions
     mapping(address => mapping(uint256 => FinalizedAuction)) public auctionEscrow;
@@ -62,12 +62,17 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
     /**
      * @dev Deposit funds for an order.
      */
-    function depositForOrder(address seller, uint256 amount, address buyer) external payable {
+    function depositForOrder(address seller, uint256 amount, address buyer, uint256 orderId) external payable {
         require(msg.value == amount, "Escrow: value mismatch");
-        require(msg.sender == auctionContract, "Escrow: did not use marketplace contract");
+        require( msg.sender == marketPlaceContract, "Escrow: invalid caller");
 
-        orderEscrow[buyer][seller] =
-            FinalizedOrder({seller: payable(seller), buyer: buyer, amount: amount, isReceived: false});
+        orderEscrow[buyer][seller][orderId] = FinalizedOrder({
+            seller: payable(seller),
+            buyer: buyer,
+            amount: amount,
+            isReceived: false
+        });
+
 
         emit DepositForOrder(buyer, seller, amount);
     }
@@ -95,8 +100,8 @@ contract Escrow is ReentrancyGuard, IERC721Receiver, Ownable(msg.sender) {
     /**
      * @dev Release funds for an order.
      */
-    function releaseForOrder(address buyer, address seller) external {
-        FinalizedOrder storage order = orderEscrow[buyer][seller];
+    function releaseForOrder(address buyer, address seller, uint256 orderId) external {
+        FinalizedOrder storage order = orderEscrow[buyer][seller][orderId];
         require(msg.sender == order.buyer, "Escrow: not buyer");
         require(order.amount > 0, "Escrow: no funds to release");
         require(order.isReceived == false, "Escrow: order already released");
