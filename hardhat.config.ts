@@ -10,7 +10,7 @@ const {
 } = process.env;
 
 const config: HardhatUserConfig = {
-  solidity: '0.8.24',
+  solidity: '0.8.27',
   networks: {
     hardhat: {
       forking: {
